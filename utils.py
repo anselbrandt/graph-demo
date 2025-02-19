@@ -8,7 +8,6 @@ import unicodedata
 import warnings
 from urllib.parse import urlparse
 
-from bs4 import BeautifulSoup
 from lancedb.pydantic import LanceModel, Vector
 import gensim
 import glirel
@@ -17,7 +16,6 @@ import networkx as nx
 import numpy as np
 import pandas as pd
 import pyvis
-import requests
 import spacy
 
 from constants import (
@@ -26,7 +24,6 @@ from constants import (
     GLINER_MODEL,
     NER_LABELS,
     RE_LABELS,
-    SCRAPE_HEADERS,
     SPACY_MODEL,
     STOP_WORDS,
     TR_ALPHA,
@@ -142,28 +139,11 @@ def scrape_html(
     chunk_list: typing.List[TextChunk],
     chunk_id: int,
 ) -> int:
-    """
-    A simple web page text scraper, which also performs chunking.
-    Returns the updated `chunk_id` index.
-    """
-    response: requests.Response = requests.get(
-        url,
-        headers=SCRAPE_HEADERS,
-    )
-
-    soup: BeautifulSoup = BeautifulSoup(
-        response.text,
-        features="lxml",
-    )
 
     article_name = urlparse(url).path.split("/")[-1]
-    out_dir = Path("output")
-    out_dir.mkdir(exist_ok=True)
-
-    parsed_text = "\n".join([para.text.strip() for para in soup.find_all("p")])
-    parsed_path = out_dir / f"{article_name}.txt"
-    with open(parsed_path, "w") as f:
-        f.write(parsed_text)
+    parsed_path = Path("output") / f"{article_name}.txt"
+    with open(parsed_path, "r") as f:
+        parsed_text = f.read()
 
     scrape_doc: spacy.tokens.doc.Doc = scrape_nlp(parsed_text)
 
