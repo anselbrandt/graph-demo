@@ -52,35 +52,6 @@ class Entity:
     node: typing.Optional[int] = None
 
 
-def uni_scrubber(
-    span: spacy.tokens.span.Span,
-) -> str:
-    """
-    Applies multiple approaches for aggressively removing garbled Unicode
-    and spurious punctuation from the given text.
-
-    OH: "It scrubs the garble from its stream... or it gets the debugger again!"
-    """
-    text: str = span.text
-
-    if type(text).__name__ != "str":
-        print("not a string?", type(text), text)
-
-    limpio: str = " ".join(map(lambda s: s.strip(), text.split("\n"))).strip()
-
-    limpio = limpio.replace("“", '"').replace("”", '"')
-    limpio = (
-        limpio.replace("‘", "'").replace("’", "'").replace("`", "'").replace("â", "'")
-    )
-    limpio = limpio.replace("…", "...").replace("–", "-")
-
-    limpio = str(
-        unicodedata.normalize("NFKD", limpio).encode("ascii", "ignore").decode("utf-8")
-    )
-
-    return limpio
-
-
 def make_chunk(
     doc: spacy.tokens.doc.Doc,
     url: str,
@@ -97,7 +68,7 @@ def make_chunk(
     prev_line: str = ""
 
     for sent_id, sent in enumerate(doc.sents):
-        line: str = uni_scrubber(sent)
+        line: str = sent.text
         line_len: int = len(line)
 
         if (chunk_total + line_len) > CHUNK_SIZE:
