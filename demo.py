@@ -1,12 +1,9 @@
 import json
 from pathlib import Path
 import traceback
-import tracemalloc
 import typing
 import warnings
 
-from icecream import ic
-from pyinstrument import Profiler
 import lancedb
 import networkx as nx
 
@@ -19,10 +16,6 @@ from utils import TextChunk, gen_pyvis, construct_kg
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
 if __name__ == "__main__":
-    # start the stochastic call trace profiler and memory profiler
-    profiler: Profiler = Profiler()
-    profiler.start()
-    tracemalloc.start()
 
     # define the global data structures
     url_list: typing.List[str] = [
@@ -66,14 +59,4 @@ if __name__ == "__main__":
             num_docs=len(url_list),
         )
     except Exception as ex:
-        ic(ex)
-        traceback.print_exc()
-
-    # stop the profiler and report performance statistics
-    profiler.stop()
-    profiler.print()
-
-    # report the memory usage
-    report: tuple = tracemalloc.get_traced_memory()
-    peak: float = round(report[1] / 1024.0 / 1024.0, 2)
-    print(f"peak memory usage: {peak} MB")
+        print(ex)

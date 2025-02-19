@@ -1,16 +1,13 @@
 from collections import defaultdict
 from dataclasses import dataclass
 import itertools
-import logging
 import math
-import os
 import pathlib
 import typing
 import unicodedata
 import warnings
 
 from bs4 import BeautifulSoup
-from icecream import ic
 from lancedb.pydantic import LanceModel, Vector
 import gensim
 import glirel
@@ -21,7 +18,6 @@ import pandas as pd
 import pyvis
 import requests
 import spacy
-import transformers
 
 from constants import (
     CHUNK_SIZE,
@@ -174,14 +170,6 @@ def scrape_html(
 
 
 def init_nlp() -> spacy.Language:
-    """
-    Initialize the models.
-    """
-    # override specific Hugging Face error messages, since
-    # `transformers` and `tokenizers` have noisy logging
-    logging.disable(logging.ERROR)
-    transformers.logging.set_verbosity_error()
-    os.environ["TOKENIZERS_PARALLELISM"] = "0"
 
     # load models for `spaCy`, `GLiNER`, `GLiREL`
     # this may take several minutes when run the first time
@@ -232,7 +220,7 @@ def parse_text(
         node_seq: typing.List[int] = []
 
         if debug:
-            ic(sent)
+            print(sent)
 
         for tok in sent:
             text: str = tok.text.strip()
@@ -269,7 +257,7 @@ def parse_text(
         # create the _textrank_ edges for the lexical graph,
         # which will get used for ranking, but discarded later
         if debug:
-            ic(node_seq)
+            print(node_seq)
 
         for hop in range(TR_LOOKBACK):
             for node_id, node in enumerate(node_seq[: -1 - hop]):
@@ -315,7 +303,7 @@ def make_entity(
         span_decoder[ent.loc] = ent
 
         if debug:
-            ic(ent)
+            print(ent)
 
     return ent
 
@@ -379,7 +367,7 @@ def extract_entity(
             node["label"] = ent.label
 
     if debug:
-        ic(ent)
+        print(ent)
 
 
 def extract_relations(
@@ -859,7 +847,7 @@ def construct_kg(
             lex_graph,
         )
 
-        ic(url, df.head(20))
+        print(url, df.head(20))
 
         # abstract a semantic overlay from the lexical graph
         # and persist this in the resulting KG
