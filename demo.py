@@ -18,8 +18,7 @@ if __name__ == "__main__":
 
     # define the global data structures
     files: typing.List[str] = [
-        "output/processed-red-meat-raises-risk-of-dementia.txt",
-        "output/eating-processed-red-meat-could-increase-risk-of-dementia-study-finds.txt",
+        f"output/{file.name}" for file in Path("output").iterdir() if file.is_file()
     ]
 
     vect_db: lancedb.db.LanceDBConnection = lancedb.connect(LANCEDB_URI)
