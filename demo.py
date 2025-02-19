@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-import traceback
 import typing
 import warnings
 

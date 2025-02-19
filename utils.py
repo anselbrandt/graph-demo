@@ -2,10 +2,11 @@ from collections import defaultdict
 from dataclasses import dataclass
 import itertools
 import math
-import pathlib
+from pathlib import Path
 import typing
 import unicodedata
 import warnings
+from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
 from lancedb.pydantic import LanceModel, Vector
@@ -155,9 +156,16 @@ def scrape_html(
         features="lxml",
     )
 
-    scrape_doc: spacy.tokens.doc.Doc = scrape_nlp(
-        "\n".join([para.text.strip() for para in soup.find_all("p")])
-    )
+    article_name = urlparse(url).path.split("/")[-1]
+    out_dir = Path("output")
+    out_dir.mkdir(exist_ok=True)
+
+    parsed_text = "\n".join([para.text.strip() for para in soup.find_all("p")])
+    parsed_path = out_dir / f"{article_name}.txt"
+    with open(parsed_path, "w") as f:
+        f.write(parsed_text)
+
+    scrape_doc: spacy.tokens.doc.Doc = scrape_nlp(parsed_text)
 
     chunk_id = make_chunk(
         scrape_doc,
@@ -724,7 +732,7 @@ def construct_kg(
     url_list: typing.List[str],
     chunk_table: lancedb.table.LanceTable,
     sem_overlay: nx.Graph,
-    w2v_file: pathlib.Path,
+    w2v_file: Path,
     *,
     debug: bool = True,
 ) -> None:
