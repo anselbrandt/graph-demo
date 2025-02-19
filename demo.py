@@ -17,9 +17,9 @@ warnings.simplefilter(action="ignore", category=FutureWarning)
 if __name__ == "__main__":
 
     # define the global data structures
-    url_list: typing.List[str] = [
-        "https://aaic.alz.org/releases-2024/processed-red-meat-raises-risk-of-dementia.asp",
-        "https://www.theguardian.com/society/article/2024/jul/31/eating-processed-red-meat-could-increase-risk-of-dementia-study-finds",
+    files: typing.List[str] = [
+        "output/processed-red-meat-raises-risk-of-dementia.txt",
+        "output/eating-processed-red-meat-could-increase-risk-of-dementia-study-finds.txt",
     ]
 
     vect_db: lancedb.db.LanceDBConnection = lancedb.connect(LANCEDB_URI)
@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     try:
         construct_kg(
-            url_list,
+            files,
             chunk_table,
             sem_overlay,
             Path("data/entity.w2v"),
@@ -55,7 +55,7 @@ if __name__ == "__main__":
         gen_pyvis(
             sem_overlay,
             "kg.html",
-            num_docs=len(url_list),
+            num_docs=len(files),
         )
     except Exception as ex:
         print(ex)

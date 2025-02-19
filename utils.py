@@ -4,9 +4,7 @@ import itertools
 import math
 from pathlib import Path
 import typing
-import unicodedata
 import warnings
-from urllib.parse import urlparse
 
 from lancedb.pydantic import LanceModel, Vector
 import gensim
@@ -35,7 +33,7 @@ __all__ = ["glirel"]
 
 class TextChunk(LanceModel):
     uid: int
-    url: str
+    file: str
     text: str = EMBED_FCN.SourceField()
     vector: Vector(EMBED_FCN.ndims()) = EMBED_FCN.VectorField(default=None)
 
@@ -54,7 +52,7 @@ class Entity:
 
 def make_chunk(
     doc: spacy.tokens.doc.Doc,
-    url: str,
+    file: str,
     chunk_list: typing.List[TextChunk],
     chunk_id: int,
 ) -> int:
@@ -76,7 +74,7 @@ def make_chunk(
             chunk_list.append(
                 TextChunk(
                     uid=chunk_id,
-                    url=url,
+                    file=file,
                     text="\n".join(chunks),
                 )
             )
@@ -96,7 +94,7 @@ def make_chunk(
     chunk_list.append(
         TextChunk(
             uid=chunk_id,
-            url=url,
+            file=file,
             text="\n".join(chunks),
         )
     )
@@ -104,23 +102,21 @@ def make_chunk(
     return chunk_id + 1
 
 
-def scrape_html(
+def read_file(
     scrape_nlp: spacy.Language,
-    url: str,
+    file: str,
     chunk_list: typing.List[TextChunk],
     chunk_id: int,
 ) -> int:
 
-    article_name = urlparse(url).path.split("/")[-1]
-    parsed_path = Path("output") / f"{article_name}.txt"
-    with open(parsed_path, "r") as f:
+    with open(file, "r", encoding="utf-8") as f:
         parsed_text = f.read()
 
     scrape_doc: spacy.tokens.doc.Doc = scrape_nlp(parsed_text)
 
     chunk_id = make_chunk(
         scrape_doc,
-        url,
+        file,
         chunk_list,
         chunk_id,
     )
@@ -554,7 +550,7 @@ def run_textrank(
 
 
 def abstract_overlay(
-    url: str,
+    file: str,
     chunk_list: typing.List[TextChunk],
     lex_graph: nx.Graph,
     sem_overlay: nx.Graph,
@@ -578,7 +574,7 @@ def abstract_overlay(
             node_id,
             kind="Chunk",
             chunk=chunk_id,
-            url=url,
+            file=file,
         )
 
     for node_id, node_attr in lex_graph.nodes(data=True):
@@ -657,7 +653,7 @@ def gen_pyvis(
             color = "hsla(306, 45%, 57%, 0.95)"
             size = 5
             label = node_id
-            title = node_attr.get("url")
+            title = node_attr.get("file")
 
         pv_net.add_node(
             node_id,
@@ -680,7 +676,7 @@ def gen_pyvis(
 
 
 def construct_kg(
-    url_list: typing.List[str],
+    files: typing.List[str],
     chunk_table: lancedb.table.LanceTable,
     sem_overlay: nx.Graph,
     w2v_file: Path,
@@ -696,24 +692,24 @@ def construct_kg(
     known_lemma: typing.List[str] = []
     w2v_vectors: list = []
 
-    # iterate through the URL list, scraping text and building chunks
+    # iterate through the file list, scraping text and building chunks
     chunk_id: int = 0
     scrape_nlp: spacy.Language = spacy.load(SPACY_MODEL)
 
-    for url in url_list:
+    for file in files:
         lex_graph: nx.Graph = nx.Graph()
         chunk_list: typing.List[TextChunk] = []
 
-        chunk_id = scrape_html(
+        chunk_id = read_file(
             scrape_nlp,
-            url,
+            file,
             chunk_list,
             chunk_id,
         )
 
         chunk_table.add(chunk_list)
 
-        # parse each chunk to build a lexical graph per source URL
+        # parse each chunk to build a lexical graph per source file
         for chunk in chunk_list:
             span_decoder: typing.Dict[tuple, Entity] = {}
 
@@ -800,18 +796,18 @@ def construct_kg(
                 vec.insert(0, str(sent_id))
                 w2v_vectors.append(vec)
 
-        # apply _textrank_ to the graph (in the url/doc iteration)
+        # apply _textrank_ to the graph (in the file/doc iteration)
         # then report the top-ranked extracted entities
         df: pd.DataFrame = run_textrank(
             lex_graph,
         )
 
-        print(url, df.head(20))
+        print(file, df.head(20))
 
         # abstract a semantic overlay from the lexical graph
         # and persist this in the resulting KG
         abstract_overlay(
-            url,
+            file,
             chunk_list,
             lex_graph,
             sem_overlay,
