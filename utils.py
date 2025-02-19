@@ -36,6 +36,8 @@ from constants import (
     TR_LOOKBACK,
 )
 
+__all__ = ["glirel"]
+
 
 class TextChunk(LanceModel):
     uid: int

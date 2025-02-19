@@ -5,8 +5,6 @@ import tracemalloc
 import typing
 import warnings
 
-warnings.simplefilter(action="ignore", category=FutureWarning)
-
 from icecream import ic
 from pyinstrument import Profiler
 import lancedb
@@ -17,6 +15,8 @@ from constants import (
 )
 
 from utils import TextChunk, gen_pyvis, construct_kg
+
+warnings.simplefilter(action="ignore", category=FutureWarning)
 
 if __name__ == "__main__":
     # start the stochastic call trace profiler and memory profiler
