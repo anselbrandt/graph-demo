@@ -516,7 +516,7 @@ def run_textrank(
     """
     # build a dataframe of node ranks and counts
 
-    data = [
+    data_list = [
         {
             "node_id": node,
             "weight": rank,
@@ -524,7 +524,7 @@ def run_textrank(
         }
         for node, rank in nx.pagerank(lex_graph, alpha=TR_ALPHA, weight="count").items()
     ]
-    df_rank: pd.DataFrame = pd.DataFrame.from_dict(data)
+    df_rank: pd.DataFrame = pd.DataFrame.from_dict(data_list)
 
     # normalize by column and calculate quantiles
     df1: pd.DataFrame = df_rank[["count", "weight"]].apply(
