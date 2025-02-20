@@ -13,7 +13,7 @@ from spacy.tokens.doc import Doc
 from spacy.tokens.span import Span
 import glirel
 from networkx import Graph, pagerank
-from numpy import ndarray
+from numpy import ndarray, linspace, digitize
 from pandas import DataFrame, Series
 import pyvis
 import spacy
