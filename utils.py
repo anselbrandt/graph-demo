@@ -515,18 +515,16 @@ def run_textrank(
     Run eigenvalue centrality (i.e., _Personalized PageRank_) to rank the entities.
     """
     # build a dataframe of node ranks and counts
-    df_rank: pd.DataFrame = pd.DataFrame.from_dict(
-        [
-            {
-                "node_id": node,
-                "weight": rank,
-                "count": lex_graph.nodes[node]["count"],
-            }
-            for node, rank in nx.pagerank(
-                lex_graph, alpha=TR_ALPHA, weight="count"
-            ).items()
-        ]
-    )
+
+    data = [
+        {
+            "node_id": node,
+            "weight": rank,
+            "count": lex_graph.nodes[node]["count"],
+        }
+        for node, rank in nx.pagerank(lex_graph, alpha=TR_ALPHA, weight="count").items()
+    ]
+    df_rank: pd.DataFrame = pd.DataFrame.from_dict(data)
 
     # normalize by column and calculate quantiles
     df1: pd.DataFrame = df_rank[["count", "weight"]].apply(
