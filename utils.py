@@ -12,8 +12,8 @@ from spacy.language import Language
 from spacy.tokens.doc import Doc
 from spacy.tokens.span import Span
 import glirel
-import networkx as nx
-import numpy as np
+from networkx import Graph, pagerank
+from numpy import ndarray
 from pandas import DataFrame, Series
 import pyvis
 import spacy
@@ -161,7 +161,7 @@ def init_nlp() -> Language:
 def parse_text(
     nlp: Language,
     known_lemma: List[str],
-    lex_graph: nx.Graph,
+    lex_graph: Graph,
     chunk: TextChunk,
     *,
     debug: bool = False,
@@ -274,7 +274,7 @@ def make_entity(
 
 def extract_entity(
     known_lemma: List[str],
-    lex_graph: nx.Graph,
+    lex_graph: Graph,
     ent: Entity,
     *,
     debug: bool = False,
@@ -336,7 +336,7 @@ def extract_entity(
 
 def extract_relations(
     known_lemma: List[str],
-    lex_graph: nx.Graph,
+    lex_graph: Graph,
     span_decoder: Dict[tuple, Entity],
     sent_map: Dict[Span, int],
     doc: Doc,
@@ -415,7 +415,7 @@ def calc_quantile_bins(
     num_rows: int,
     *,
     amplitude: int = 4,
-) -> np.ndarray:
+) -> ndarray:
     """
     Calculate the bins to use for a quantile stripe,
     using [`numpy.linspace`](https://numpy.org/doc/stable/reference/generated/numpy.linspace.html)
@@ -428,7 +428,7 @@ def calc_quantile_bins(
     """
     granularity = max(round(math.log(num_rows) * amplitude), 1)
 
-    return np.linspace(
+    return linspace(
         0,
         1,
         num=granularity,
@@ -439,7 +439,7 @@ def calc_quantile_bins(
 def stripe_column(
     values: list,
     bins: int,
-) -> np.ndarray:
+) -> ndarray:
     """
     Stripe a column in a dataframe, by interpolating quantiles into a set of discrete indexes.
 
@@ -456,7 +456,7 @@ def stripe_column(
     q = s.quantile(bins, interpolation="nearest")
 
     try:
-        stripe = np.digitize(values, q) - 1
+        stripe = digitize(values, q) - 1
         return stripe
     except ValueError as ex:
         # should never happen?
@@ -482,7 +482,7 @@ def root_mean_square(values: List[float]) -> float:
 
 
 def connect_entities(
-    lex_graph: nx.Graph,
+    lex_graph: Graph,
     span_decoder: Dict[tuple, Entity],
 ) -> None:
     """
@@ -506,7 +506,7 @@ def connect_entities(
 
 
 def run_textrank(
-    lex_graph: nx.Graph,
+    lex_graph: Graph,
 ) -> DataFrame:
     """
     Run eigenvalue centrality (i.e., _Personalized PageRank_) to rank the entities.
@@ -519,13 +519,13 @@ def run_textrank(
             "weight": rank,
             "count": lex_graph.nodes[node]["count"],
         }
-        for node, rank in nx.pagerank(lex_graph, alpha=TR_ALPHA, weight="count").items()
+        for node, rank in pagerank(lex_graph, alpha=TR_ALPHA, weight="count").items()
     ]
     df_rank: DataFrame = DataFrame.from_dict(data_list)
 
     # normalize by column and calculate quantiles
     df1: DataFrame = df_rank[["count", "weight"]].apply(lambda x: x / x.max(), axis=0)
-    bins: np.ndarray = calc_quantile_bins(len(df1.index))
+    bins: ndarray = calc_quantile_bins(len(df1.index))
 
     # stripe each columns
     df2: DataFrame = DataFrame(
@@ -534,7 +534,7 @@ def run_textrank(
 
     # renormalize the ranks
     df_rank["rank"] = df2.apply(root_mean_square, axis=1)
-    rank_col: np.ndarray = df_rank["rank"].to_numpy()
+    rank_col: ndarray = df_rank["rank"].to_numpy()
     rank_col /= sum(rank_col)
     df_rank["rank"] = rank_col
 
@@ -557,8 +557,8 @@ def run_textrank(
 def abstract_overlay(
     file: str,
     chunk_list: List[TextChunk],
-    lex_graph: nx.Graph,
-    sem_overlay: nx.Graph,
+    lex_graph: Graph,
+    sem_overlay: Graph,
 ) -> None:
     """
     Abstract a _semantic overlay_ from the lexical graph -- in other words
@@ -630,7 +630,7 @@ def abstract_overlay(
 
 
 def gen_pyvis(
-    graph: nx.Graph,
+    graph: Graph,
     html_file: str,
     *,
     num_docs: int = 1,

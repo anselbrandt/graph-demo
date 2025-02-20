@@ -7,7 +7,7 @@ from spacy.tokens.doc import Doc
 from spacy.tokens.span import Span
 import gensim
 import lancedb
-import networkx as nx
+from networkx import Graph
 from pandas import DataFrame
 import spacy
 
@@ -30,7 +30,7 @@ from utils import (
 def construct_kg(
     files: List[str],
     chunk_table: lancedb.table.LanceTable,
-    sem_overlay: nx.Graph,
+    sem_overlay: Graph,
     w2v_file: Path,
     *,
     debug: bool = True,
@@ -49,7 +49,7 @@ def construct_kg(
     scrape_nlp: Language = spacy.load(SPACY_MODEL)
 
     for file in files:
-        lex_graph: nx.Graph = nx.Graph()
+        lex_graph: Graph = Graph()
         chunk_list: List[TextChunk] = []
 
         chunk_id = read_file(
