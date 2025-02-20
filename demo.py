@@ -10,7 +10,8 @@ from constants import (
     LANCEDB_URI,
 )
 
-from utils import TextChunk, gen_pyvis, construct_kg
+from kg import construct_kg
+from utils import TextChunk, gen_pyvis
 
 warnings.simplefilter(action="ignore", category=FutureWarning)
 
