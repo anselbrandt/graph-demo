@@ -1,22 +1,12 @@
-import typing
-
-import lancedb
-from lancedb.embeddings import get_registry
-
+from typing import List, Dict, Set
 
 CHUNK_SIZE: int = 1024
-
-EMBED_MODEL: str = "BAAI/bge-small-en-v1.5"
-
-EMBED_FCN: lancedb.embeddings.transformers.TransformersEmbeddingFunction = (
-    get_registry().get("huggingface").create(name=EMBED_MODEL)
-)
 
 GLINER_MODEL: str = "urchade/gliner_small-v2.1"
 
 LANCEDB_URI = "data/lancedb"
 
-NER_LABELS: typing.List[str] = [
+NER_LABELS: List[str] = [
     "Behavior",
     "City",
     "Company",
@@ -61,13 +51,13 @@ RE_LABELS: dict = {
     }
 }
 
-SCRAPE_HEADERS: typing.Dict[str, str] = {
+SCRAPE_HEADERS: Dict[str, str] = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.95 Safari/537.36",
 }
 
 SPACY_MODEL: str = "en_core_web_md"
 
-STOP_WORDS: typing.Set[str] = set(
+STOP_WORDS: Set[str] = set(
     [
         "PRON.it",
         "PRON.that",

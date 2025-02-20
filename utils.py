@@ -3,22 +3,26 @@ from dataclasses import dataclass
 import itertools
 import math
 from pathlib import Path
-import typing
+from typing import Tuple, Optional, Dict, List, Set
 import warnings
 
 from lancedb.pydantic import LanceModel, Vector
 import gensim
 import glirel
 import lancedb
+from lancedb.embeddings import get_registry
+from lancedb.embeddings.transformers import TransformersEmbeddingFunction
 import networkx as nx
 import numpy as np
 import pandas as pd
 import pyvis
 import spacy
+from spacy.language import Language
+from spacy.tokens.doc import Doc
+from spacy.tokens.span import Span
 
 from constants import (
     CHUNK_SIZE,
-    EMBED_FCN,
     GLINER_MODEL,
     NER_LABELS,
     RE_LABELS,
@@ -30,6 +34,12 @@ from constants import (
 
 __all__ = ["glirel"]
 
+EMBED_MODEL: str = "BAAI/bge-small-en-v1.5"
+
+EMBED_FCN: TransformersEmbeddingFunction = (
+    get_registry().get("huggingface").create(name=EMBED_MODEL)
+)
+
 
 class TextChunk(LanceModel):
     uid: int
@@ -40,20 +50,20 @@ class TextChunk(LanceModel):
 
 @dataclass(order=False, frozen=False)
 class Entity:
-    loc: typing.Tuple[int]
+    loc: tuple[int, int]
     key: str
     text: str
     label: str
     chunk_id: int
     sent_id: int
-    span: spacy.tokens.span.Span
-    node: typing.Optional[int] = None
+    span: Span
+    node: Optional[int] = None
 
 
 def make_chunk(
-    doc: spacy.tokens.doc.Doc,
+    doc: Doc,
     file: str,
-    chunk_list: typing.List[TextChunk],
+    chunk_list: List[TextChunk],
     chunk_id: int,
 ) -> int:
     """
@@ -61,7 +71,7 @@ def make_chunk(
     BTW, for ideal text chunk size see
     <https://www.llamaindex.ai/blog/evaluating-the-ideal-chunk-size-for-a-rag-system-using-llamaindex-6207e5d3fec5>
     """
-    chunks: typing.List[str] = []
+    chunks: List[str] = []
     chunk_total: int = 0
     prev_line: str = ""
 
@@ -103,16 +113,16 @@ def make_chunk(
 
 
 def read_file(
-    scrape_nlp: spacy.Language,
+    scrape_nlp: Language,
     file: str,
-    chunk_list: typing.List[TextChunk],
+    chunk_list: List[TextChunk],
     chunk_id: int,
 ) -> int:
 
     with open(file, "r", encoding="utf-8") as f:
         parsed_text = f.read()
 
-    scrape_doc: spacy.tokens.doc.Doc = scrape_nlp(parsed_text)
+    scrape_doc: Doc = scrape_nlp(parsed_text)
 
     chunk_id = make_chunk(
         scrape_doc,
@@ -124,11 +134,11 @@ def read_file(
     return chunk_id
 
 
-def init_nlp() -> spacy.Language:
+def init_nlp() -> Language:
 
     # load models for `spaCy`, `GLiNER`, `GLiREL`
     # this may take several minutes when run the first time
-    nlp: spacy.Language = spacy.load(SPACY_MODEL)
+    nlp: Language = spacy.load(SPACY_MODEL)
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -152,27 +162,29 @@ def init_nlp() -> spacy.Language:
 
 
 def parse_text(
-    nlp: spacy.Language,
-    known_lemma: typing.List[str],
+    nlp: Language,
+    known_lemma: List[str],
     lex_graph: nx.Graph,
     chunk: TextChunk,
     *,
     debug: bool = False,
-) -> spacy.tokens.doc.Doc:
+) -> Doc:
     """
     Parse an input text chunk, returning a `spaCy` document.
     """
-    doc: spacy.tokens.doc.Doc = list(
+    doc: Doc = list(
         nlp.pipe(
             [(chunk.text, RE_LABELS)],
             as_tuples=True,
         )
-    )[0][0]
+    )[
+        0
+    ][0]
 
     # scan the document tokens to add lemmas to _lexical graph_ using
     # a _textgraph_ approach called the _textrank_ algorithm
     for sent in doc.sents:
-        node_seq: typing.List[int] = []
+        node_seq: List[int] = []
 
         if debug:
             print(sent)
@@ -229,9 +241,9 @@ def parse_text(
 
 
 def make_entity(
-    span_decoder: typing.Dict[tuple, Entity],
-    sent_map: typing.Dict[spacy.tokens.span.Span, int],
-    span: spacy.tokens.span.Span,
+    span_decoder: Dict[tuple, Entity],
+    sent_map: Dict[Span, int],
+    span: Span,
     chunk: TextChunk,
     *,
     debug: bool = False,
@@ -264,7 +276,7 @@ def make_entity(
 
 
 def extract_entity(
-    known_lemma: typing.List[str],
+    known_lemma: List[str],
     lex_graph: nx.Graph,
     ent: Entity,
     *,
@@ -326,11 +338,11 @@ def extract_entity(
 
 
 def extract_relations(
-    known_lemma: typing.List[str],
+    known_lemma: List[str],
     lex_graph: nx.Graph,
-    span_decoder: typing.Dict[tuple, Entity],
-    sent_map: typing.Dict[spacy.tokens.span.Span, int],
-    doc: spacy.tokens.doc.Doc,
+    span_decoder: Dict[tuple, Entity],
+    sent_map: Dict[Span, int],
+    doc: Doc,
     chunk: TextChunk,
     *,
     debug: bool = False,
@@ -338,15 +350,15 @@ def extract_relations(
     """
     Extract the relations inferred by `GLiREL` adding these to the graph.
     """
-    relations: typing.List[dict] = sorted(
+    relations: List[dict] = sorted(
         doc._.relations,
         key=lambda item: item["score"],
         reverse=True,
     )
 
     for item in relations:
-        src_loc: typing.Tuple[int] = tuple(item["head_pos"])
-        dst_loc: typing.Tuple[int] = tuple(item["tail_pos"])
+        src_loc: Tuple[int] = tuple(item["head_pos"])
+        dst_loc: Tuple[int] = tuple(item["tail_pos"])
         redact_rel: bool = False
 
         if src_loc not in span_decoder:
@@ -455,7 +467,7 @@ def stripe_column(
         raise
 
 
-def root_mean_square(values: typing.List[float]) -> float:
+def root_mean_square(values: List[float]) -> float:
     """
     Calculate the [*root mean square*](https://mathworld.wolfram.com/Root-Mean-Square.html)
     of the values in the given list.
@@ -474,12 +486,12 @@ def root_mean_square(values: typing.List[float]) -> float:
 
 def connect_entities(
     lex_graph: nx.Graph,
-    span_decoder: typing.Dict[tuple, Entity],
+    span_decoder: Dict[tuple, Entity],
 ) -> None:
     """
     Connect entities which co-occur within the same sentence.
     """
-    ent_map: typing.Dict[int, typing.Set[int]] = defaultdict(set)
+    ent_map: Dict[int, Set[int]] = defaultdict(set)
 
     for ent in span_decoder.values():
         if ent.node is not None:
@@ -551,7 +563,7 @@ def run_textrank(
 
 def abstract_overlay(
     file: str,
-    chunk_list: typing.List[TextChunk],
+    chunk_list: List[TextChunk],
     lex_graph: nx.Graph,
     sem_overlay: nx.Graph,
 ) -> None:
@@ -562,10 +574,10 @@ def abstract_overlay(
     Also connect the extracted entities with their source chunks, where
     the latter first-class citizens within the KG.
     """
-    kept_nodes: typing.Set[int] = set()
-    skipped_rel: typing.Set[str] = set(["FOLLOWS_LEXICALLY", "COMPOUND_ELEMENT_OF"])
+    kept_nodes: Set[int] = set()
+    skipped_rel: Set[str] = set(["FOLLOWS_LEXICALLY", "COMPOUND_ELEMENT_OF"])
 
-    chunk_nodes: typing.Dict[int, str] = {
+    chunk_nodes: Dict[int, str] = {
         chunk.uid: f"chunk_{chunk.uid}" for chunk in chunk_list
     }
 
@@ -676,7 +688,7 @@ def gen_pyvis(
 
 
 def construct_kg(
-    files: typing.List[str],
+    files: List[str],
     chunk_table: lancedb.table.LanceTable,
     sem_overlay: nx.Graph,
     w2v_file: Path,
@@ -688,17 +700,17 @@ def construct_kg(
     """
     # define the global data structures which must be reset for each
     # run, not on each chunk iteration
-    nlp: spacy.Language = init_nlp()
-    known_lemma: typing.List[str] = []
+    nlp: Language = init_nlp()
+    known_lemma: List[str] = []
     w2v_vectors: list = []
 
     # iterate through the file list, scraping text and building chunks
     chunk_id: int = 0
-    scrape_nlp: spacy.Language = spacy.load(SPACY_MODEL)
+    scrape_nlp: Language = spacy.load(SPACY_MODEL)
 
     for file in files:
         lex_graph: nx.Graph = nx.Graph()
-        chunk_list: typing.List[TextChunk] = []
+        chunk_list: List[TextChunk] = []
 
         chunk_id = read_file(
             scrape_nlp,
@@ -711,9 +723,9 @@ def construct_kg(
 
         # parse each chunk to build a lexical graph per source file
         for chunk in chunk_list:
-            span_decoder: typing.Dict[tuple, Entity] = {}
+            span_decoder: Dict[tuple, Entity] = {}
 
-            doc: spacy.tokens.doc.Doc = parse_text(
+            doc: Doc = parse_text(
                 nlp,
                 known_lemma,
                 lex_graph,
@@ -723,7 +735,7 @@ def construct_kg(
 
             # keep track of sentence numbers per chunk, to use later
             # for entity co-occurrence links
-            sent_map: typing.Dict[spacy.tokens.span.Span, int] = {}
+            sent_map: Dict[Span, int] = {}
 
             for sent_id, sent in enumerate(doc.sents):
                 sent_map[sent] = sent_id
@@ -785,7 +797,7 @@ def construct_kg(
             )
 
             # build the vector input for entity embeddings
-            w2v_map: typing.Dict[int, typing.Set[str]] = defaultdict(set)
+            w2v_map: Dict[int, Set[str]] = defaultdict(set)
 
             for ent in span_decoder.values():
                 if ent.node is not None:
